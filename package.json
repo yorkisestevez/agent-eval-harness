@@ -37,13 +37,13 @@
   ],
   "author": "Yorkis Estevez",
   "license": "MIT",
-  "homepage": "https://github.com/yorkis/agent-eval-harness#readme",
+  "homepage": "https://github.com/yorkisestevez/agent-eval-harness#readme",
   "bugs": {
-    "url": "https://github.com/yorkis/agent-eval-harness/issues"
+    "url": "https://github.com/yorkisestevez/agent-eval-harness/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yorkis/agent-eval-harness.git"
+    "url": "git+https://github.com/yorkisestevez/agent-eval-harness.git"
   },
   "publishConfig": {
     "access": "public"
