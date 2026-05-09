@@ -1,0 +1,14 @@
+{
+  "sample-agent": {
+    "required": ["result", "widget_count", "by_type", "summary"],
+    "types": {
+      "result": "string",
+      "widget_count": "number",
+      "by_type": "object",
+      "summary": "string"
+    },
+    "enums": {
+      "result": ["ok", "rejected"]
+    }
+  }
+}

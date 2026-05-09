@@ -1,0 +1,2 @@
+{"id":"sample-1","prompt":"count the widgets in this inventory dump","expect_agent":"sample-agent"}
+{"id":"sample-2","prompt":"summarize widget counts by type from the dump file","expect_agent":"sample-agent"}

@@ -1,0 +1,51 @@
+{
+  "name": "agent-eval-harness",
+  "version": "0.1.0",
+  "description": "Static + schema + routing + spawn-fixture eval harness for *.md subagents (Claude Code, etc.). Catches description bloat, fence-mimicry, low routing margin, and schema regressions before they ship.",
+  "main": "index.js",
+  "bin": {
+    "agent-eval": "./cli.js"
+  },
+  "files": [
+    "index.js",
+    "cli.js",
+    "lib/",
+    "suites/",
+    "init/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "agents",
+    "subagents",
+    "claude-code",
+    "claude",
+    "anthropic",
+    "eval",
+    "lint",
+    "linter",
+    "ai",
+    "llm",
+    "routing"
+  ],
+  "author": "Yorkis Estevez",
+  "license": "MIT",
+  "homepage": "https://github.com/yorkis/agent-eval-harness#readme",
+  "bugs": {
+    "url": "https://github.com/yorkis/agent-eval-harness/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yorkis/agent-eval-harness.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,19 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local test scratch
+/scratch/
+/tmp/
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+
+# npm artifacts
+*.tgz
+.npmrc

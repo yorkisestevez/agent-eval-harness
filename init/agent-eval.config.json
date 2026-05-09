@@ -1,0 +1,10 @@
+{
+  "agentSourceDir": "./agents",
+  "fixturesDir": "./_evals/fixtures",
+  "schemasFile": "./_evals/schemas.json",
+  "casesFile": "./_evals/cases.jsonl",
+  "validTools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookEdit", "Task"],
+  "minDescriptionChars": 40,
+  "maxTools": 5,
+  "defaultThreshold": 0.85
+}
