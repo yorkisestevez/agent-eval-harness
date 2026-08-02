@@ -46,10 +46,26 @@ jobs:
           config: init/agent-eval.config.json
           threshold: "1.0"
           strict: "true"
+      - name: Reject invalid strict input
+        id: invalid-strict
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        continue-on-error: true
+        uses: ./
+        with:
+          config: init/agent-eval.config.json
+          threshold: "1.0"
+          strict: "invalid"
+      - name: Verify invalid strict input failed
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20 && steps.invalid-strict.outcome != 'failure'
+        run: exit 1
 
   package-smoke:
-    name: Clean npm install smoke
-    runs-on: ubuntu-latest
+    name: Clean npm install / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,3 +85,44 @@ jobs:
           npm install "$RUNNER_TEMP/agent-eval-package/$tarball"
           npx agent-eval --init
           npx agent-eval --threshold=1.0 --strict
+          if npx agent-eval --threshold=-1; then
+            echo "negative threshold bypassed the CI gate" >&2
+            exit 1
+          fi
+          if npx agent-eval --threshold -1; then
+            echo "space-separated negative threshold bypassed the CI gate" >&2
+            exit 1
+          fi
+          if npx agent-eval --threshold=1 --threshold=0 --strict; then
+            echo "duplicate threshold bypassed the CI gate" >&2
+            exit 1
+          fi
+          cp agent-eval.config.json agent-eval.config.good
+          printf '%s' '{"defaultThreshold":1,"defaultThreshold":0}' > agent-eval.config.json
+          if npx agent-eval --static; then
+            echo "duplicate config key bypassed the CI gate" >&2
+            exit 1
+          fi
+          mv agent-eval.config.good agent-eval.config.json
+          if npx agent-eval --threshold=1 --strict --help; then
+            echo "help mode bypassed evaluation options" >&2
+            exit 1
+          fi
+          cp _evals/schemas.json _evals/schemas.good
+          printf '%s' '{"../secret":{"required":["result"],"types":{"result":"string"}}}' > _evals/schemas.json
+          if npx agent-eval --threshold=1 --strict; then
+            echo "fixture path traversal bypassed the CI gate" >&2
+            exit 1
+          fi
+          printf '%s' '{"sample-agent":{}}' > _evals/schemas.json
+          if npx agent-eval --threshold=1 --strict; then
+            echo "empty schema bypassed the CI gate" >&2
+            exit 1
+          fi
+          mv _evals/schemas.good _evals/schemas.json
+          mv _evals/cases.jsonl _evals/cases.good
+          if npx agent-eval --threshold=1 --strict; then
+            echo "missing cases bypassed the CI gate" >&2
+            exit 1
+          fi
+          mv _evals/cases.good _evals/cases.jsonl

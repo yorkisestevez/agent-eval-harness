@@ -27,12 +27,14 @@ Agent Eval Harness turns those failures into a deterministic CI exit code.
 ## Start in 30 seconds
 
 ```bash
-mkdir agent-spec-demo && cd agent-spec-demo
+mkdir agent-eval-demo && cd agent-eval-demo
 npm init -y
-npm install --save-dev agent-eval-harness
+npm install --save-dev github:yorkisestevez/agent-eval-harness#v0.2.1
 npx agent-eval --init
 npx agent-eval --threshold=1.0 --strict
 ```
+
+This pins the audited `v0.2.1` GitHub release. Once the npm badge above reports `0.2.1` or newer, the registry equivalent is `npm install --save-dev agent-eval-harness`.
 
 `--init` creates a passing reference project:
 
@@ -69,7 +71,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - uses: yorkisestevez/agent-eval-harness@v0.2.0
+      - uses: yorkisestevez/agent-eval-harness@v0.2.1
         with:
           config: agent-eval.config.json
           threshold: "1.0"
@@ -89,7 +91,7 @@ For higher supply-chain assurance, pin the action to a full commit SHA.
 | **Fence audit** | JSON fences in return contracts that models may imitate |
 | **Overlap audit** | agent descriptions with high Jaccard overlap |
 
-`--strict` promotes fence, overlap, and missing-fixture findings from informational to blocking.
+`--strict` promotes fence, overlap, and missing-fixture findings from informational to blocking. Threshold and strict mode are independent: `--threshold=1.0` requires a perfect score but does not enable strict audits unless `--strict` is also present.
 
 ## Agent format
 
@@ -114,11 +116,11 @@ Schema fields:
 - `logic_errors`: array
 ```
 
-The parser accepts LF and CRLF line endings. Keep frontmatter values on one line.
+The parser accepts LF and CRLF line endings. Frontmatter uses a strict one-line grammar: unique `key: value` pairs with plain scalars, JSON-escaped double-quoted strings, or YAML-style single-quoted strings (`''` escapes a quote). Malformed quotes, flow collections, and multiline YAML are rejected rather than guessed.
 
 ## Configuration
 
-Paths are resolved relative to the config file, not the shell's current directory.
+Paths are resolved relative to the config file, not the shell's current directory. The config root must be an object; duplicate keys, unknown keys, and invalid value types are rejected rather than ignored. Duplicate object keys are also rejected in routing cases, schemas, and extracted fixture JSON.
 
 ```json
 {
@@ -134,6 +136,7 @@ Paths are resolved relative to the config file, not the shell's current director
 ```
 
 Select a config with `--config=path/to/agent-eval.config.json` or `AGENT_EVAL_CONFIG`.
+Thresholds must be finite numbers from `0` through `1`; invalid or out-of-range values fail closed with exit code `1`.
 
 ## CLI
 
@@ -141,7 +144,7 @@ Select a config with `--config=path/to/agent-eval.config.json` or `AGENT_EVAL_CO
 agent-eval [options]
 
 --config=<path>      explicit config file
---threshold=<0..1>   minimum total score
+--threshold=<0..1>   minimum total score (space-separated form also accepted)
 --strict             make informational audits blocking
 --static             run static checks only
 --schema             run schema checks only
@@ -153,6 +156,8 @@ agent-eval [options]
 --init               scaffold a sample project
 --help               show help
 ```
+
+Unknown arguments, missing option values, non-decimal or malformed thresholds, repeated `--threshold`/`--config` options, and attempts to combine standalone `--help`/`--init` modes with evaluation options fail closed with exit code `1`.
 
 Exit codes:
 
@@ -168,11 +173,11 @@ Use JSONL with one expected route per prompt:
 {"id":"security-review","prompt":"audit this authentication diff for vulnerabilities","expect_agent":"code-reviewer"}
 ```
 
-Routing uses deterministic IDF-weighted recall over descriptions. It is an early-warning proxy for an LLM router, not a claim that it reproduces every model's decision.
+Routing uses deterministic IDF-weighted recall over descriptions. It is an early-warning proxy for an LLM router, not a claim that it reproduces every model's decision. Selecting the routing suite requires the configured cases file to exist; strict routing also requires at least one valid case. Case objects require unique, non-empty `id`, `prompt`, and `expect_agent` strings.
 
 ## Fixture contracts
 
-A fixture is a recorded agent response at `_evals/fixtures/<agent-name>.txt`. It may contain raw JSON, fenced JSON, or surrounding prose. The harness extracts the first balanced JSON value and validates it against `_evals/schemas.json`.
+A fixture is a recorded agent response at `_evals/fixtures/<agent-name>.txt`. It may contain raw JSON, fenced JSON, or surrounding prose. The harness extracts the first balanced JSON value and validates it against `_evals/schemas.json`. The schema map must be a non-empty object, each agent key must be a safe basename, and every per-agent schema must contain a real constraint. Required fields must declare a type or nested contract. Under `--strict`, at least one agent must load, every loaded agent must have a schema, orphan schemas are rejected, every schema must have a fixture, and each fixture must exercise at least one constrained field.
 
 ```json
 {

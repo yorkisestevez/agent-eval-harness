@@ -22,6 +22,7 @@ function staticSuite(agents, config) {
   const results = [];
   for (const a of agents) {
     const checks = [];
+    checks.push({ name: 'valid-frontmatter', pass: !a.error, detail: a.error || '' });
     checks.push({ name: 'has-name', pass: !!a.name });
     checks.push({ name: 'has-description', pass: a.description.length >= minDesc });
     checks.push({ name: `tools<=${maxTools}`, pass: a.tools.length <= maxTools && a.tools.length >= 1 });

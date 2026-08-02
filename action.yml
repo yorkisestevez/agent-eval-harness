@@ -30,7 +30,9 @@ runs:
         AGENT_EVAL_STRICT_INPUT: ${{ inputs.strict }}
       run: |
         args=("--config=${AGENT_EVAL_CONFIG_INPUT}" "--threshold=${AGENT_EVAL_THRESHOLD_INPUT}")
-        if [[ "${AGENT_EVAL_STRICT_INPUT}" == "true" ]]; then
-          args+=("--strict")
-        fi
+        case "${AGENT_EVAL_STRICT_INPUT}" in
+          true) args+=("--strict") ;;
+          false) ;;
+          *) echo "strict must be true or false" >&2; exit 1 ;;
+        esac
         node "${GITHUB_ACTION_PATH}/cli.js" "${args[@]}"

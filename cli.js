@@ -9,7 +9,7 @@
 //   agent-eval --routing                    # only routing
 //   agent-eval --schema                     # only schema (+ fence audit)
 //   agent-eval --spawn                      # only spawn-fixture
-//   agent-eval --threshold=1.0              # auto-on --strict at 1.0
+//   agent-eval --threshold=1.0              # require a 100% score
 //   agent-eval --strict                     # promote informational audits to blocking
 //   agent-eval --verbose
 //   agent-eval --json                       # also emit JSON failure dump
@@ -26,27 +26,74 @@ const {
   spawnSuite,
 } = require('./index');
 
+function parseThreshold(raw) {
+  const value = raw.trim();
+  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?|\.\d+)$/.test(value)) return NaN;
+  return Number(value);
+}
+
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
     configPath: null,
     threshold: null,
-    verbose: args.includes('--verbose'),
-    json: args.includes('--json'),
-    strict: args.includes('--strict'),
-    init: args.includes('--init'),
+    verbose: false,
+    json: false,
+    strict: false,
+    init: false,
+    help: false,
     suites: [],
+    errors: [],
   };
-  for (const a of args) {
-    if (a.startsWith('--config=')) opts.configPath = a.slice('--config='.length);
-    else if (a.startsWith('--threshold=')) opts.threshold = parseFloat(a.slice('--threshold='.length));
-    else if (a === '--static') opts.suites.push('static');
-    else if (a === '--schema') opts.suites.push('schema');
-    else if (a === '--routing') opts.suites.push('routing');
-    else if (a === '--spawn') opts.suites.push('spawn');
-    else if (a === '--all') opts.suites = ['static', 'schema', 'routing', 'spawn'];
-    else if (a === '--help' || a === '-h') opts.help = true;
+  let seenConfig = false;
+  let seenThreshold = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--config=')) {
+      const value = arg.slice('--config='.length);
+      if (seenConfig) opts.errors.push('duplicate --config option');
+      else if (!value) opts.errors.push('--config requires a value');
+      else opts.configPath = value;
+      seenConfig = true;
+    } else if (arg === '--config') {
+      const value = args[i + 1];
+      if (seenConfig) opts.errors.push('duplicate --config option');
+      else if (!value || value.startsWith('--')) opts.errors.push('--config requires a value');
+      else opts.configPath = value;
+      seenConfig = true;
+      if (value && !value.startsWith('--')) i++;
+    } else if (arg.startsWith('--threshold=')) {
+      if (seenThreshold) opts.errors.push('duplicate --threshold option');
+      else opts.threshold = parseThreshold(arg.slice('--threshold='.length));
+      seenThreshold = true;
+    } else if (arg === '--threshold') {
+      const value = args[i + 1];
+      if (seenThreshold) opts.errors.push('duplicate --threshold option');
+      else if (value === undefined || value.startsWith('--')) opts.errors.push('--threshold requires a value');
+      else opts.threshold = parseThreshold(value);
+      seenThreshold = true;
+      if (value !== undefined && !value.startsWith('--')) i++;
+    } else if (arg === '--static') opts.suites.push('static');
+    else if (arg === '--schema') opts.suites.push('schema');
+    else if (arg === '--routing') opts.suites.push('routing');
+    else if (arg === '--spawn') opts.suites.push('spawn');
+    else if (arg === '--all') opts.suites = ['static', 'schema', 'routing', 'spawn'];
+    else if (arg === '--verbose') opts.verbose = true;
+    else if (arg === '--json') opts.json = true;
+    else if (arg === '--strict') opts.strict = true;
+    else if (arg === '--init') opts.init = true;
+    else if (arg === '--help' || arg === '-h') opts.help = true;
+    else opts.errors.push(`unknown argument: ${arg}`);
   }
+
+  if (opts.help && opts.init) opts.errors.push('--help and --init are mutually exclusive');
+  const hasMode = opts.help || opts.init;
+  const hasEvaluationOptions = args.some(arg => !['--help', '-h', '--init'].includes(arg));
+  if (hasMode && hasEvaluationOptions) {
+    opts.errors.push('--help and --init cannot be combined with evaluation options');
+  }
+
   if (opts.suites.length === 0) opts.suites = ['static', 'schema', 'routing', 'spawn'];
   return opts;
 }
@@ -59,7 +106,7 @@ function help() {
     '  agent-eval                       # all suites',
     '  agent-eval --config=path.json    # explicit config file',
     '  agent-eval --static              # one suite',
-    '  agent-eval --threshold=1.0       # auto-strict at 1.0',
+    '  agent-eval --threshold=1.0       # require a 100% score',
     '  agent-eval --init                # scaffold a sample project',
     '',
     'Config: looks for ./agent-eval.config.json by default.',
@@ -87,12 +134,28 @@ function runInit(cwd = process.cwd()) {
 
 function main() {
   const opts = parseArgs(process.argv);
+  if (opts.errors.length) {
+    for (const error of opts.errors) console.error(error);
+    process.exitCode = 1;
+    return;
+  }
   if (opts.help) return help();
   if (opts.init) return runInit();
+  if (opts.threshold !== null &&
+      (!Number.isFinite(opts.threshold) || opts.threshold < 0 || opts.threshold > 1)) {
+    console.error('threshold must be a finite number between 0 and 1');
+    process.exitCode = 1;
+    return;
+  }
 
   const config = loadConfig({ configPath: opts.configPath });
-  const threshold = opts.threshold ?? config.defaultThreshold ?? 0.85;
-  const strict = opts.strict || threshold >= 1.0;
+  const threshold = opts.threshold !== null ? opts.threshold : config.defaultThreshold;
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+    console.error('threshold must be a finite number between 0 and 1');
+    process.exitCode = 1;
+    return;
+  }
+  const strict = opts.strict;
   const verbose = opts.verbose;
 
   if (config.__configPath) {
@@ -102,7 +165,12 @@ function main() {
   }
 
   const agents = loadAgents(config.agentSourceDir);
-  const cases = loadCases(config.casesFile);
+  const cases = opts.suites.includes('routing') ? loadCases(config.casesFile) : [];
+  if (strict && opts.suites.includes('routing') && cases.length === 0) {
+    console.error('strict routing requires at least one case');
+    process.exitCode = 1;
+    return;
+  }
 
   let totalChecks = 0, totalPass = 0;
   const failures = [];
@@ -178,13 +246,13 @@ function main() {
   }
 
   if (opts.suites.includes('spawn')) {
-    const sp = spawnSuite(config, { strict });
-    console.log(`\n=== Spawn suite (${sp.coveredAgents}/${Object.keys(require(config.schemasFile)).length} agents covered) ===`);
+    const sp = spawnSuite(config, { strict, expectedAgents: agents.map(agent => agent.name) });
+    console.log(`\n=== Spawn suite (${sp.coveredAgents}/${sp.schemaCount} agents covered) ===`);
     for (const r of sp.results) {
       if (r.pass) {
         if (verbose) console.log(`  ✓ ${r.agent}`);
       } else {
-        const detail = r.reason === 'schema' ? r.errors.join('; ')
+        const detail = ['schema', 'invalid-schema'].includes(r.reason) ? r.errors.join('; ')
                      : r.reason === 'extract-json' ? r.detail
                      : r.reason;
         console.log(`  ✗ ${r.agent} — ${detail}`);
