@@ -1,6 +1,6 @@
 {
   "name": "agent-eval-harness",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Static, schema, routing, and fixture-contract CI for markdown-defined AI agents.",
   "main": "index.js",
   "bin": {

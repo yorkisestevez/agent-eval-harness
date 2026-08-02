@@ -9,7 +9,7 @@
 // Plus a fence audit: agents using ```json INSIDE the Return contract section
 // can provoke fence-mimicry in some LLMs (response wraps the JSON in fences,
 // breaking naive JSON.parse). Informational by default; promoted to BLOCKING
-// under --strict / threshold=1.0.
+// under --strict.
 
 function schemaSuite(agents) {
   const results = [];
