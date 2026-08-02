@@ -1,33 +1,124 @@
-# agent-eval-harness
+# Agent Eval Harness
 
-Static + schema + routing + spawn-fixture eval harness for `*.md` subagent definitions.
+> Your agent prompts are code. Test them like code.
 
-Drop a directory of agents (Claude Code subagents, or any markdown-frontmatter agents) into a project, point the harness at it, and get a 100-point lint that catches description bloat, scope drift, fence-mimicry traps, low routing margin, and schema regressions before they ship.
+[![CI](https://github.com/yorkisestevez/agent-eval-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/yorkisestevez/agent-eval-harness/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/agent-eval-harness.svg)](https://www.npmjs.com/package/agent-eval-harness)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](package.json)
 
-## Quick start
+**Agent Eval Harness** is a zero-dependency CI harness for Markdown-defined AI agents. It catches invalid metadata, routing collisions, output-contract drift, and broken recorded fixtures before they reach an orchestrator.
+
+The npm package and CLI retain the original name: `agent-eval-harness` / `agent-eval`.
+
+## The failure mode it prevents
+
+Agent collections drift as they grow:
+
+- descriptions overlap until the router picks the wrong specialist
+- an agent loses its explicit “use when…” trigger
+- tool access expands without review
+- output examples stop matching downstream schemas
+- JSON fences and prose break strict callers
+- an agent definition behaves differently on Windows because line endings changed
+
+Agent Eval Harness turns those failures into a deterministic CI exit code.
+
+## Start in 30 seconds
 
 ```bash
-# In a fresh directory
-node /path/to/agent-eval-harness/cli.js --init
-node /path/to/agent-eval-harness/cli.js --threshold=1.0
+mkdir agent-spec-demo && cd agent-spec-demo
+npm init -y
+npm install --save-dev agent-eval-harness
+npx agent-eval --init
+npx agent-eval --threshold=1.0 --strict
 ```
 
-`--init` scaffolds `agents/`, `_evals/`, and an `agent-eval.config.json`. The sample agent passes 100% out of the box — copy its shape for your own.
+`--init` creates a passing reference project:
+
+```text
+agent-eval.config.json
+agents/sample-agent.md
+_evals/cases.jsonl
+_evals/schemas.json
+_evals/fixtures/sample-agent.txt
+```
+
+Point the config at your own agent directory, replace the sample fixtures, and commit it beside your agents.
+
+## Add it to GitHub Actions
+
+```yaml
+name: Agent specs
+
+on:
+  pull_request:
+    paths:
+      - "agents/**"
+      - "_evals/**"
+      - "agent-eval.config.json"
+
+permissions:
+  contents: read
+
+jobs:
+  agentspec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: yorkisestevez/agent-eval-harness@v0.2.0
+        with:
+          config: agent-eval.config.json
+          threshold: "1.0"
+          strict: "true"
+```
+
+For higher supply-chain assurance, pin the action to a full commit SHA.
 
 ## What it checks
 
-| Suite | Per-agent | What it catches |
-|---|---|---|
-| **static** | 8 checks | missing name/description, too many tools, invalid tool names, file-name mismatch, missing trigger ("use when..."), no Scope/Hard-rules section, agent calls itself recursively |
-| **schema** | 1 check + fence audit | no Return Contract section, no JSON shape declared, ` ```json ` fence inside Return Contract (provokes mimicry in some LLMs) |
-| **routing** | N cases + overlap audit | wrong agent ranks first for a given prompt, zero margin between top two, two descriptions overlap ≥0.20 Jaccard |
-| **spawn** | M schema-bound agents | fixture in `fixtures/<name>.txt` doesn't parse as JSON, missing required fields, type mismatches, enum violations |
+| Suite | Failure caught |
+|---|---|
+| **Static** | missing or malformed metadata, filename/name mismatch, invalid or excessive tools, missing trigger, missing scope/refusal rules, recursive agent calls |
+| **Schema** | missing return contract or undeclared JSON shape |
+| **Routing** | expected agent does not rank first or has zero margin over the runner-up |
+| **Spawn fixture** | recorded output cannot be extracted or violates required fields, primitive types, enums, or nested shape |
+| **Fence audit** | JSON fences in return contracts that models may imitate |
+| **Overlap audit** | agent descriptions with high Jaccard overlap |
 
-Strict mode (`--strict` or `--threshold=1.0`) promotes the fence audit, overlap audit, and missing-fixture from informational to blocking.
+`--strict` promotes fence, overlap, and missing-fixture findings from informational to blocking.
 
-## Config
+## Agent format
 
-`agent-eval.config.json` — paths and thresholds. Resolved relative to the config file's directory:
+```markdown
+---
+name: code-reviewer
+description: Use when a pull request needs an independent security and logic review.
+tools: Read, Grep, Glob
+---
+
+## Scope
+
+Review the supplied diff. Do not modify files.
+
+## Return contract
+
+Return JSON only.
+
+Schema fields:
+- `passed`: boolean
+- `security_concerns`: array
+- `logic_errors`: array
+```
+
+The parser accepts LF and CRLF line endings. Keep frontmatter values on one line.
+
+## Configuration
+
+Paths are resolved relative to the config file, not the shell's current directory.
 
 ```json
 {
@@ -42,54 +133,112 @@ Strict mode (`--strict` or `--threshold=1.0`) promotes the fence audit, overlap 
 }
 ```
 
-Override paths via `--config=path/to/cfg.json` or `AGENT_EVAL_CONFIG` env var.
+Select a config with `--config=path/to/agent-eval.config.json` or `AGENT_EVAL_CONFIG`.
 
-## Library use
+## CLI
 
-```js
-const { loadConfig, loadAgents, staticSuite, schemaSuite, routingSuite, spawnSuite } = require('agent-eval-harness');
+```text
+agent-eval [options]
 
-const config = loadConfig({ configPath: './agent-eval.config.json' });
-const agents = loadAgents(config.agentSourceDir);
-const results = staticSuite(agents, config);
-// ... render however you want
+--config=<path>      explicit config file
+--threshold=<0..1>   minimum total score
+--strict             make informational audits blocking
+--static             run static checks only
+--schema             run schema checks only
+--routing            run routing checks only
+--spawn              run fixture-contract checks only
+--all                run every suite
+--verbose            print passing checks
+--json               append structured failure details
+--init               scaffold a sample project
+--help               show help
 ```
 
-## Schema file shape
+Exit codes:
+
+- `0` — score met the threshold
+- `1` — runtime/configuration error
+- `2` — checks completed below threshold
+
+## Routing cases
+
+Use JSONL with one expected route per prompt:
+
+```jsonl
+{"id":"security-review","prompt":"audit this authentication diff for vulnerabilities","expect_agent":"code-reviewer"}
+```
+
+Routing uses deterministic IDF-weighted recall over descriptions. It is an early-warning proxy for an LLM router, not a claim that it reproduces every model's decision.
+
+## Fixture contracts
+
+A fixture is a recorded agent response at `_evals/fixtures/<agent-name>.txt`. It may contain raw JSON, fenced JSON, or surrounding prose. The harness extracts the first balanced JSON value and validates it against `_evals/schemas.json`.
 
 ```json
 {
-  "<agent-name>": {
-    "required": ["field1", "field2"],
-    "types": { "field1": "string", "field2": "number" },
-    "enums": { "field1": ["ok", "error"] },
-    "nested": {
-      "field2": { "required": ["sub1"], "types": { "sub1": "string" } }
+  "code-reviewer": {
+    "required": ["passed", "security_concerns", "logic_errors"],
+    "types": {
+      "passed": "boolean",
+      "security_concerns": "array",
+      "logic_errors": "array"
     }
   }
 }
 ```
 
-## Cases file shape (cases.jsonl)
+Agent Eval Harness does **not** execute agents or regenerate fixtures. That is deliberate: CI stays local, deterministic, credential-free, and safe to run on pull requests.
 
-One JSON object per line:
+## Library API
 
-```jsonl
-{"id":"case-1","prompt":"some user prompt","expect_agent":"agent-name"}
+```js
+const {
+  loadConfig,
+  loadAgents,
+  staticSuite,
+  schemaSuite,
+  routingSuite,
+  spawnSuite,
+  extractJson,
+} = require('agent-eval-harness');
+
+const config = loadConfig({ configPath: './agent-eval.config.json' });
+const agents = loadAgents(config.agentSourceDir);
+const staticResults = staticSuite(agents, config);
 ```
 
-## Fixture file shape
+## Security and privacy
 
-`fixtures/<agent-name>.txt` — a real recorded response from spawning the agent. Can include surrounding prose or fences; the harness extracts the JSON. Aim for one fixture per schema-bound agent.
+The core package:
 
-## Exit codes
+- has zero runtime dependencies
+- reads only the local paths selected by its config
+- makes no network requests
+- does not invoke agents
+- does not execute fixture content
+- does not require API keys
 
-| Code | Meaning |
-|---|---|
-| 0 | Score ≥ threshold |
-| 1 | Runtime error (config missing, file not found) |
-| 2 | Score below threshold |
+See [SECURITY.md](SECURITY.md) for reporting and the complete security model.
+
+## Limits
+
+- Frontmatter parsing intentionally supports simple one-line values, not full YAML folded scalars.
+- The default tool allowlist is Claude Code-oriented but configurable.
+- The English stemmer is not a multilingual semantic router.
+- Fixture validation supports a focused contract shape, not the complete JSON Schema specification.
+- Routing is a deterministic regression signal, not a live model evaluation.
+
+## Contributing
+
+Run:
+
+```bash
+npm ci
+npm test
+```
+
+Changes must remain cross-platform and include a failing regression test first. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT.
+MIT © Yorkis Estevez

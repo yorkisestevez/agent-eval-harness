@@ -16,6 +16,20 @@ function routingSuite(agents, cases) {
   const idf = buildIDF(agents);
   const results = [];
   for (const c of cases) {
+    if (agents.length === 0) {
+      results.push({
+        id: c.id,
+        expected: c.expect_agent,
+        got: null,
+        score: 0,
+        margin: 0,
+        ratio: 0,
+        runner_up: null,
+        pass: false,
+        reason: 'no-agents',
+      });
+      continue;
+    }
     const promptTokens = tokenize(c.prompt);
     const scored = agents.map(a => ({
       agent: a.name,

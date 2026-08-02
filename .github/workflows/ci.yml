@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 18
+          - os: ubuntu-latest
+            node: 20
+          - os: ubuntu-latest
+            node: 22
+          - os: windows-latest
+            node: 20
+          - os: windows-latest
+            node: 22
+          - os: macos-latest
+            node: 20
+          - os: macos-latest
+            node: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Self-test the GitHub Action
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        uses: ./
+        with:
+          config: init/agent-eval.config.json
+          threshold: "1.0"
+          strict: "true"
+
+  package-smoke:
+    name: Clean npm install smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Pack and install into a clean project
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-eval-package" "$RUNNER_TEMP/agent-eval-consumer"
+          npm pack --json --pack-destination "$RUNNER_TEMP/agent-eval-package" > "$RUNNER_TEMP/pack.json"
+          tarball=$(node -e "console.log(require(process.env.RUNNER_TEMP + '/pack.json')[0].filename)")
+          cd "$RUNNER_TEMP/agent-eval-consumer"
+          npm init -y >/dev/null
+          npm install "$RUNNER_TEMP/agent-eval-package/$tarball"
+          npx agent-eval --init
+          npx agent-eval --threshold=1.0 --strict

@@ -4,6 +4,26 @@ All notable changes to `agent-eval-harness` documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Version policy: [SemVer](https://semver.org/) — major for breaking config/CLI changes, minor for new suites or check types, patch for bug fixes and tightened audits.
 
+## [0.2.0] — 2026-08-01
+
+### Added
+
+- Clear CI-first product positioning and a 30-second npm quick start.
+- Reusable GitHub Action with configurable path, threshold, and strict mode.
+- CI across Node 18/20/22 on Windows, Linux, and macOS.
+- Clean npm pack/install/CLI smoke gate.
+- Security policy and contribution workflow.
+
+### Fixed
+
+- Parse Markdown agent definitions with CRLF or LF line endings.
+- Return a deterministic failed routing result when no valid agents load instead of throwing a `TypeError`.
+- Use the active Node executable in the self-test for cross-platform reliability.
+
+### Security
+
+- Documented the local-only, no-network, no-agent-execution runtime model.
+
 ## [0.1.0] — 2026-05-09
 
 Initial extraction from the in-tree harness at `~/.claude/agents/_evals/`.
