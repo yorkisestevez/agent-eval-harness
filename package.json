@@ -1,10 +1,10 @@
 {
   "name": "agent-eval-harness",
-  "version": "0.1.0",
-  "description": "Static + schema + routing + spawn-fixture eval harness for *.md subagents (Claude Code, etc.). Catches description bloat, fence-mimicry, low routing margin, and schema regressions before they ship.",
+  "version": "0.2.0",
+  "description": "Static, schema, routing, and fixture-contract CI for markdown-defined AI agents.",
   "main": "index.js",
   "bin": {
-    "agent-eval": "./cli.js"
+    "agent-eval": "cli.js"
   },
   "files": [
     "index.js",
@@ -14,24 +14,27 @@
     "init/",
     "README.md",
     "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test.js"
+    "test": "node test.js",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=18"
   },
   "keywords": [
+    "agent-eval",
+    "agent-skills",
     "agents",
     "subagents",
     "claude-code",
-    "claude",
-    "anthropic",
     "eval",
+    "testing",
+    "ci",
     "lint",
-    "linter",
-    "ai",
     "llm",
     "routing"
   ],

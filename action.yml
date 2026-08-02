@@ -1,0 +1,36 @@
+name: Agent Eval Harness
+description: Fail CI when markdown-defined AI agents drift, collide, or break their output contracts.
+author: Yorkis Estevez
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  config:
+    description: Path to agent-eval.config.json, relative to the repository root.
+    required: false
+    default: agent-eval.config.json
+  threshold:
+    description: Minimum passing score from 0 to 1.
+    required: false
+    default: "1.0"
+  strict:
+    description: Promote overlap, fence, and missing-fixture audits to blocking checks.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Run Agent Eval Harness
+      shell: bash
+      env:
+        AGENT_EVAL_CONFIG_INPUT: ${{ inputs.config }}
+        AGENT_EVAL_THRESHOLD_INPUT: ${{ inputs.threshold }}
+        AGENT_EVAL_STRICT_INPUT: ${{ inputs.strict }}
+      run: |
+        args=("--config=${AGENT_EVAL_CONFIG_INPUT}" "--threshold=${AGENT_EVAL_THRESHOLD_INPUT}")
+        if [[ "${AGENT_EVAL_STRICT_INPUT}" == "true" ]]; then
+          args+=("--strict")
+        fi
+        node "${GITHUB_ACTION_PATH}/cli.js" "${args[@]}"
